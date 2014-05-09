@@ -10,15 +10,21 @@ import signal
 import cPickle as pk
 import hashlib
 import random
-import psutil
-from joblib import Parallel, delayed
 from math import floor
+try:
+    from psutil import phymem_usage
+except ImportError:
+    print 'mparrun: psutil unavailable. disabling pmemlimit'
+
+    # dummy function
+    def phymem_usage():                   # noqa
+        return [0.]
 
 NPROC = -1
 PORT = 32288
 HOST = ''                                 # all available interfaces
-BDIR =  os.path.expanduser('~/.mparrun')
-FTOK =  BDIR + '/ftok'
+BDIR = os.path.expanduser('~/.mparrun')
+FTOK = BDIR + '/ftok'
 SLIST = BDIR + '/default_spawn'
 RLOCK = BDIR + '/mparrun_run_%s_%s'       # file-based run-lock mechanism
 PMEMLIMIT = 80.
@@ -34,12 +40,14 @@ PREFIX = 'mparrun'
 ALARM = 10
 TFMT = '%Y%m%d_%H%M%S'
 
+
 # Server Part ----------------------------------------------------------------
 class MyTCPHandler(SocketServer.StreamRequestHandler):
     def handle(self):
         req = self.data = self.rfile.readline().strip()
         tokens = req.split(SEP)
-        if len(tokens) <= 1: return
+        if len(tokens) <= 1:
+            return
         t0, cmd = tokens[:2]
 
         # {{ command get:
@@ -52,7 +60,8 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
                 # end of job tidbits..
                 print 'mparrun: end of job'
                 server._end_notified = True
-                if server._self_shutdown: signal.alarm(ALARM)
+                if server._self_shutdown:
+                    signal.alarm(ALARM)
                 return
 
             # some diag messages
@@ -60,19 +69,22 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
             if n % 20 == 0:
                 dt = time.time() - server._t0
                 nd = QD.qsize()              # done tasks
-                if nd == 0: nd = 1
+                if nd == 0:
+                    nd = 1
                 v = float(dt) / float(nd)
                 ls = v * n                   # left time in secs
-                H = int(floor(ls/3600.))
+                H = int(floor(ls / 3600.))
                 lhs = ls % 3600
-                M = int(floor(lhs/60.))
+                M = int(floor(lhs / 60.))
                 S = int(ls % 60)
 
-                H0 = int(floor(dt/3600.))
+                H0 = int(floor(dt / 3600.))
                 lhs0 = dt % 3600
-                M0 = int(floor(lhs0/60.))
+                M0 = int(floor(lhs0 / 60.))
                 S0 = int(dt % 60)
-                print 'mparrun: %d jobs left (%d:%02d:%02d left, %d:%02d:%02d passed)' % (n, H, M, S, H0, M0, S0)
+                print 'mparrun: %d jobs left' \
+                        ' (%d:%02d:%02d left, %d:%02d:%02d passed)' % \
+                        (n, H, M, S, H0, M0, S0)
 
             # send the job
             jid, job = Q.get()
@@ -82,12 +94,12 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
         # end of get }}
 
 
-
 def handler(signum, frame):
     cleanup()
 
+
 def cleanup():
-    if server._server == None or server._closed:
+    if server._server is None or server._closed:
         return
     print 'mparrun: shutting down...'
     server._server.server_close()
@@ -107,7 +119,8 @@ def server(jobs, port=PORT):
     check_basedir()
     hostname = os.uname()[1].replace(' ', '')
     ftok = FTOK
-    open(ftok, 'wt').write(hostname + '\n' + str(port))   # writedown the host address
+    # writedown the host address
+    open(ftok, 'wt').write(hostname + '\n' + str(port))
 
     n = len(jobs)
     print 'mparrun: server started. ^C to stop.'
@@ -129,12 +142,13 @@ server._server = None
 server._t0 = None
 
 
-# Client Part ---------------------------------------------------------------------
-def client_worker(addr, port, active, rseed):
+# Client Part -----------------------------------------------------------------
+def client_worker(addr, port, active, rseed, delaymax=5.):
     errs = []
     stats = []
     client_worker.active = active
-    pid = os.getpid(); s_pid = str(pid)
+    pid = os.getpid()
+    s_pid = str(pid)
     hostname = os.uname()[1].replace(' ', '')
     theano_flags_cpu = 'THEANO_FLAGS="base_compiledir=~/.theano%02d"' % rseed
     random.seed(rseed)
@@ -143,11 +157,13 @@ def client_worker(addr, port, active, rseed):
     signal.signal(signal.SIGTERM, handler_client)
 
     while True:
-        # check system %memory first
-        time.sleep(random.random() * 5.)
+        if delaymax > 0:
+            # staggered start
+            time.sleep(random.random() * delaymax)
         terminated = False
+        # check system %memory first
         while True:
-            if psutil.phymem_usage()[-1] < client_worker.pmemlimit:
+            if phymem_usage()[-1] < client_worker.pmemlimit:
                 break
             if not os.path.exists(active):
                 terminated = True
@@ -185,7 +201,8 @@ def client_worker(addr, port, active, rseed):
             continue
 
         t, job, jid = tokens
-        if job == EOJ: break
+        if job == EOJ:
+            break
         if t != t0:                  # not matching time stamp. corrupted.
             print >>sys.stderr, 'mparrun: corrupted message:', tokens
             errs.append(('Invalid Time Stamp', tokens))
@@ -199,7 +216,8 @@ def client_worker(addr, port, active, rseed):
             job = job.replace('${node}', hostname)
             job = job.replace('${workerid}', str(rseed))
             print 'mparrun: final cmd:        %s' % job
-            sys.stdout.flush()       # this is needed to ensure the stdout order
+            # v this is needed to ensure the stdout order
+            sys.stdout.flush()
             errcode = os.system(job)
             hash = hashlib.md5(job).digest()
             stats.append((jid, errcode, hash))
@@ -210,16 +228,19 @@ def client_worker(addr, port, active, rseed):
 client_worker.active = None
 client_worker.pmemlimit = PMEMLIMIT
 
+
 def xsend(w, s):
     while len(w) > 0:
-        ns = s.send(w) 
-        w = w[ns:] 
+        ns = s.send(w)
+        w = w[ns:]
+
 
 def xrecv(s):
     res = ''
     while True:
         r = s.recv(4)
-        if r == '': return res
+        if r == '':
+            return res
         res += r
 
 
@@ -227,17 +248,20 @@ def handler_client(signum, frame):
     print 'Wait until all the threads terminated...'
     cleanup_client()
 
+
 def cleanup_client():
     active = client_worker.active
-    if active != None and os.path.exists(active):
+    if active is not None and os.path.exists(active):
         try:
             os.unlink(active)
-        except OSError:          # ignore when multiple threads attempted to del the file
+        except OSError:
+            # ignore when multiple threads attempted to del the file
             print 'mparrun: cleaned up.'
             pass
-        
+
 
 def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX, pmemlimit=PMEMLIMIT):
+    from joblib import Parallel, delayed
     print 'mparrun: server =', addr
 
     signal.signal(signal.SIGINT, handler_client)
@@ -251,8 +275,10 @@ def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX, pmemlimit=PMEMLIMIT):
     client_worker.active = active
     client_worker.pmemlimit = pmemlimit
 
-    if nproc < 0: nproc = detectCPUs()
-    res = Parallel(n_jobs=nproc, verbose=0)(delayed(client_worker)(addr, port, active, i) for i in xrange(nproc))
+    if nproc < 0:
+        nproc = detectCPUs()
+    res = Parallel(n_jobs=nproc, verbose=0)(delayed(client_worker)(
+        addr, port, active, i) for i in xrange(nproc))
     endtime = time.strftime(TFMT)
 
     # extract some error info
@@ -263,14 +289,14 @@ def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX, pmemlimit=PMEMLIMIT):
             break
     if err_found:
         dmpfn = prefix + '_dmp_' + endtime + '.pk'
-        dmp = open(dmpfn, 'wb') 
+        dmp = open(dmpfn, 'wb')
         print 'mparrun: there were warnings/errors. dumping...', dmpfn
         pk.dump([r[0] for r in res], dmp)
         dmp.close()
 
     # dump stats: extract other task info
     dmpfn = prefix + '_stat_' + hostname + '_' + endtime + '.pk'
-    dmp = open(dmpfn, 'wb') 
+    dmp = open(dmpfn, 'wb')
     pk.dump([r[1] for r in res], dmp)
     dmp.close()
 
@@ -278,12 +304,13 @@ def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX, pmemlimit=PMEMLIMIT):
     cleanup_client()
     print 'mparrun: finished.'
 
+    return int(err_found)
 
 
-# Verification Part ---------------------------------------------------------------------
+# Verification Part -----------------------------------------------------------
 def verify(src_files, stat_files, cmdprn=False):
     print 'mparrun: verify stat files.'
-    
+
     n = 0
     # if cmdprn:
     #     jobs = []
@@ -298,13 +325,13 @@ def verify(src_files, stat_files, cmdprn=False):
         cmd = ''
         for line0 in open(f).readlines():
             line = line0.strip()
-            if line[-1] == '\\': cmd += line[:-1] + ' '
+            if line[-1] == '\\':
+                cmd += line[:-1] + ' '
             else:
                 jobs.append(cmd + line)
                 cmd = ''
-    n = len(jobs) 
+    n = len(jobs)
     jid_all = set(range(n))
-
 
     badfound = False
     for f in stat_files:
@@ -326,7 +353,8 @@ def verify(src_files, stat_files, cmdprn=False):
     if len(jid_left) > 0:
         print 'mparrun: unfinished jobs:', jid_left
         if cmdprn:
-            for jid in jid_left: print >>sys.stderr, jobs[jid]
+            for jid in jid_left:
+                print >>sys.stderr, jobs[jid]
         badfound = True
 
     if not badfound:
@@ -336,9 +364,10 @@ def verify(src_files, stat_files, cmdprn=False):
         print 'mparrun: done.'
 
 
-
-# Client Spawing Part --------------------------------------------------------------------
-def spawn(all_args, slist=SLIST, prefix=PREFIX, dry=False, exclude=None, runcmd=False, redir=True):
+# Client Spawing Part --------------------------------------------------------
+def spawn(all_args, slist=SLIST, prefix=PREFIX, dry=False, exclude=None,
+        runcmd=False, redir=True):
+    from joblib import Parallel, delayed
     import string as ss
 
     cwd = os.getcwd()
@@ -346,28 +375,34 @@ def spawn(all_args, slist=SLIST, prefix=PREFIX, dry=False, exclude=None, runcmd=
     wd = os.path.relpath(cwd, home)
     jobs = []
 
-    if runcmd: nopass = ['r', '--n', '--redir']
-    else: nopass = ['cs', '--n']
+    if runcmd:
+        nopass = ['r', '--n', '--redir']
+    else:
+        nopass = ['cs', '--n']
     nopass_opts = ['--slist=', '--exclude=']
-    passargs = [a for a in all_args if a.lower() not in nopass and all([a[:len(n)] != n for n in nopass_opts])]
+    passargs = [a for a in all_args if a.lower() not in nopass and
+            all([a[:len(n)] != n for n in nopass_opts])]
 
     print 'mparrun: creating jobs:'
     for node_info0 in open(slist).readlines():
         ninfo = node_info0.strip().split()
         node = ninfo[0]
         # if node is in the excluded list, skip it.
-        if exclude != None and any([e in node for e in exclude]): continue
+        if exclude is not None and any([e in node for e in exclude]):
+            continue
 
         # -- process commands
         nodeargs, nodeopts = parse_opts(ninfo[1:], optpx='++')
         # arguemnts to be passed
-        if runcmd: args = ss.join(passargs)
-        else: args = ss.join(nodeargs + passargs)
+        if runcmd:
+            args = ss.join(passargs)
+        else:
+            args = ss.join(nodeargs + passargs)
 
         # process options
         cd = wd
         if 'cd' in nodeopts:
-            cd = nodeopts['cd'] 
+            cd = nodeopts['cd']
         pre_cmd = ''
         if 'rhome' in nodeopts:
             pre_cmd += 'cd %s && ' % nodeopts['rhome']
@@ -381,45 +416,54 @@ def spawn(all_args, slist=SLIST, prefix=PREFIX, dry=False, exclude=None, runcmd=
         if runcmd:
             cmd_run = args
             if redir:
-                cmd_body =  "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile && %s cd %s && %s 2> %s > %s %s'"
-                cmd = cmd_body % (node, pre_cmd, cd, cmd_run, stderr, stdout, after_cmd)
+                cmd_body = "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile" + \
+                        " && %s cd %s && %s 2> %s > %s %s'"
+                cmd = cmd_body % (node, pre_cmd, cd, cmd_run,
+                        stderr, stdout, after_cmd)
             else:
-                cmd_body =  "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile && %s cd %s && %s'"
+                cmd_body = "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile" + \
+                        " && %s cd %s && %s'"
                 cmd = cmd_body % (node, pre_cmd, cd, cmd_run)
         else:
             cmd_run = 'mparrun.py c ' + args
-            cmd_body =  "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile && %s cd %s && %s 2> %s > %s %s'"
-            cmd = cmd_body % (node, pre_cmd, cd, cmd_run, stderr, stdout, after_cmd)
+            cmd_body = "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile" + \
+                    " && %s cd %s && %s 2> %s > %s %s'"
+            cmd = cmd_body % (node, pre_cmd, cd, cmd_run,
+                    stderr, stdout, after_cmd)
         print '  ', cmd
         jobs.append(cmd)
 
     if not dry:
         print 'mparrun: running jobs...'
-        r = Parallel(n_jobs=len(jobs), verbose=0)(delayed(os.system)(j) for j in jobs)
+        Parallel(n_jobs=len(jobs), verbose=0)(delayed(os.system)(j)
+                for j in jobs)
     else:
         print 'mparrun: DRY-RUN'
     print 'mparrun: all finished.'
 
-# Housekeeping Part ----------------------------------------------------------------------
+
+# Housekeeping Part ----------------------------------------------------------
 def detectCPUs():
     # Linux, Unix and MacOS:
     if hasattr(os, "sysconf"):
-       if os.sysconf_names.has_key("SC_NPROCESSORS_ONLN"):
-           # Linux & Unix:
-         ncpus = os.sysconf("SC_NPROCESSORS_ONLN")
-         if isinstance(ncpus, int) and ncpus > 0:
-             return ncpus
-    else: # OSX:
+        if 'SC_NPROCESSORS_ONLN' in os.sysconf_names:
+            # Linux & Unix:
+            ncpus = os.sysconf("SC_NPROCESSORS_ONLN")
+            if isinstance(ncpus, int) and ncpus > 0:
+                return ncpus
+    else:  # OSX
         return int(os.popen2("sysctl -n hw.ncpu")[1].read())
     # Windows:
-    if os.environ.has_key("NUMBER_OF_PROCESSORS"):
-        ncpus = int(os.environ["NUMBER_OF_PROCESSORS"]);
+    if 'NUMBER_OF_PROCESSORS' in os.environ:
+        ncpus = int(os.environ["NUMBER_OF_PROCESSORS"])
         if ncpus > 0:
             return ncpus
     return 1
 
 
 def check_basedir(bdir=BDIR):
+    if bdir == '':
+        return
     if not os.path.exists(bdir):
         os.makedirs(bdir)
 
@@ -432,7 +476,8 @@ def parse_opts(tokens, optpx='--'):
 
     for token in tokens:
         if token[:2] == optpx: opts0.append(token[n:])
-        else: args.append(token)
+        else:
+            args.append(token)
 
     for opt in opts0:
         parsed = opt.split('=')
@@ -447,6 +492,7 @@ def parse_opts(tokens, optpx='--'):
 
 
 def main():
+    exitcode = 0
     if len(sys.argv) < 2:
         print 'Server mode:'
         print 'mparrun.py s <joblist file> [options]'
@@ -465,7 +511,7 @@ def main():
         print '--exclude=str  comma separted server list to exlcuded'
         print '--n            dry-run'
         print '(all client options are supported/passed)'
-        print 
+        print
         print 'Simple spawn running mode:'
         print 'mparrun.py r <command>'
         print '--slist=str    path to the spawning list'
@@ -476,7 +522,7 @@ def main():
         print 'Verify mode:'
         print 'mparrun.py v <joblist.sh> <stat.1.pk> [stat.2.pk] ...'
         print '--cmdprn       print the failed commands to stderr'
-        return
+        return 0
 
     # parse options and arguments
     args, opts = parse_opts(sys.argv[1:])
@@ -543,14 +589,15 @@ def main():
     if mode.lower() in ['s', 'server']:
         if len(args) < 2:
             print 'mparrun: joblist file required.'
-            return
+            return 1
         f = open(args[1])
         # jobs = [line.strip() for line in f.readlines()]
         jobs = []
         cmd = ''
         for line0 in f.readlines():
             line = line0.strip()
-            if line[-1] == '\\': cmd += line[:-1] + ' '
+            if line[-1] == '\\':
+                cmd += line[:-1] + ' '
             else:
                 jobs.append(cmd + line)
                 cmd = ''
@@ -565,15 +612,17 @@ def main():
             f = open(ftok)
             addr = f.readline().strip()
             port = int(f.readline().strip())
-        client(addr, port, nproc, prefix, pmemlimit=pmemlimit)
+        exitcode = client(addr, port, nproc, prefix, pmemlimit=pmemlimit)
 
     # or, spawn clients
     elif mode.lower() == 'cs':
-        spawn(sys.argv[1:], slist=slist, prefix=prefix, dry=dry, exclude=exclude)
+        spawn(sys.argv[1:], slist=slist, prefix=prefix, dry=dry,
+                exclude=exclude)
 
     # or, spawn running mode
     elif mode.lower() == 'r':
-        spawn(sys.argv[1:], slist=slist, prefix=prefix, dry=dry, exclude=exclude, runcmd=True, redir=redir)
+        spawn(sys.argv[1:], slist=slist, prefix=prefix, dry=dry,
+                exclude=exclude, runcmd=True, redir=redir)
 
     # or, verify
     elif mode.lower() in ['v', 'verify']:
@@ -582,8 +631,10 @@ def main():
     # unknown mode
     else:
         print 'mparrun: unknown mode.'
-        return
+
+    return exitcode
 
 
 if __name__ == '__main__':
-    main()
+    exitcode = main()
+    sys.exit(exitcode)
