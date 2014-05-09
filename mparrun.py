@@ -28,6 +28,8 @@ FTOK = BDIR + '/ftok'
 SLIST = BDIR + '/default_spawn'
 RLOCK = BDIR + '/mparrun_run_%s_%s'       # file-based run-lock mechanism
 PMEMLIMIT = 80.
+MAXDELAY = 3.
+MAXCNT = 0                                # run jobs indefinitely
 THEANO_CPU = '${theano_flags_cpu}'
 
 # ---------------------------------------------------------------------------
@@ -143,9 +145,11 @@ server._t0 = None
 
 
 # Client Part -----------------------------------------------------------------
-def client_worker(addr, port, active, rseed, delaymax=5.):
+def client_worker(addr, port, active, rseed,
+        pmemlimit=PMEMLIMIT, maxcnt=MAXCNT, maxdelay=MAXDELAY):
     errs = []
     stats = []
+    cnt = 0
     client_worker.active = active
     pid = os.getpid()
     s_pid = str(pid)
@@ -157,13 +161,13 @@ def client_worker(addr, port, active, rseed, delaymax=5.):
     signal.signal(signal.SIGTERM, handler_client)
 
     while True:
-        if delaymax > 0:
+        if maxdelay > 0:
             # staggered start
-            time.sleep(random.random() * delaymax)
+            time.sleep(random.random() * maxdelay)
         terminated = False
         # check system %memory first
         while True:
-            if phymem_usage()[-1] < client_worker.pmemlimit:
+            if phymem_usage()[-1] < pmemlimit:
                 break
             if not os.path.exists(active):
                 terminated = True
@@ -224,9 +228,12 @@ def client_worker(addr, port, active, rseed, delaymax=5.):
         except Exception as e:
             errs.append(('Run-time Error', tokens, e))
 
+        cnt += 1
+        if maxcnt > 0 and cnt >= maxcnt:
+            break
+
     return errs, stats
 client_worker.active = None
-client_worker.pmemlimit = PMEMLIMIT
 
 
 def xsend(w, s):
@@ -260,7 +267,8 @@ def cleanup_client():
             pass
 
 
-def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX, pmemlimit=PMEMLIMIT):
+def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX,
+        pmemlimit=PMEMLIMIT, maxcnt=MAXCNT, maxdelay=MAXDELAY):
     from joblib import Parallel, delayed
     print 'mparrun: server =', addr
 
@@ -273,12 +281,13 @@ def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX, pmemlimit=PMEMLIMIT):
     active = RLOCK % (hostname, starttime)
     open(active, 'wt').close()    # create a run-lock file.
     client_worker.active = active
-    client_worker.pmemlimit = pmemlimit
 
     if nproc < 0:
         nproc = detectCPUs()
     res = Parallel(n_jobs=nproc, verbose=0)(delayed(client_worker)(
-        addr, port, active, i) for i in xrange(nproc))
+        addr, port, active, i,
+        pmemlimit=pmemlimit, maxcnt=maxcnt, maxdelay=maxdelay)
+        for i in xrange(nproc))
     endtime = time.strftime(TFMT)
 
     # extract some error info
@@ -504,6 +513,8 @@ def main():
         print '--port=#       set the port number'
         print '--pmemlimit=#  set the %memory limit (0 < # < 100)'
         print '--prefix=str   output info file prefix (= --px)'
+        print '--maxdelay=#   maximum delay in staggered job starting'
+        print '--maxcnt=#     exit after running # jobs'
         print
         print 'Spawn mode:'
         print 'mparrun.py cs [options]'
@@ -548,6 +559,16 @@ def main():
     if 'port' in opts:
         port = int(opts['port'])
         print 'mparrun: port =', port
+
+    maxcnt = MAXCNT
+    if 'maxcnt' in opts:
+        maxcnt = int(opts['maxcnt'])
+        print 'mparrun: maxcnt =', maxcnt
+
+    maxdelay = MAXDELAY
+    if 'maxdelay' in opts:
+        maxdelay = float(opts['maxdelay'])
+        print 'mparrun: maxdelay =', maxdelay
 
     prefix = PREFIX
     if 'prefix' in opts:
@@ -612,7 +633,8 @@ def main():
             f = open(ftok)
             addr = f.readline().strip()
             port = int(f.readline().strip())
-        exitcode = client(addr, port, nproc, prefix, pmemlimit=pmemlimit)
+        exitcode = client(addr, port, nproc, prefix,
+                pmemlimit=pmemlimit, maxcnt=maxcnt, maxdelay=maxdelay)
 
     # or, spawn clients
     elif mode.lower() == 'cs':
