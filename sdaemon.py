@@ -4,10 +4,27 @@ import os
 import time
 import subprocess
 import sys
+import socket
 
 JOB_LEVEL_CMD = 'squeue -u hahong'
 N_THRESHOLD = 50
 N_REPS = N_THRESHOLD
+HOST = None
+PORT = None
+
+
+def is_server_alive(host, port):
+    if host is None or port is None:
+        return True    # indefinite running
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.connect((host, port))
+        sock.close()
+        return True
+    except:
+        # host is down
+        return False
 
 
 def get_job_level(job_level_cmd=JOB_LEVEL_CMD, screen=['om_']):
@@ -17,23 +34,32 @@ def get_job_level(job_level_cmd=JOB_LEVEL_CMD, screen=['om_']):
         any([s in e for s in screen])])
 
 
-def main(argv):
-    n_threshold = N_THRESHOLD
-    n_reps = N_REPS
-
+def main(argv, n_threshold=N_THRESHOLD, n_reps=N_REPS,
+        host=HOST, port=PORT):
     if 'NTHR' in os.environ:
         n_threshold = int(os.environ['NTHR'])
         print '* n_threshold =', n_threshold
     if 'NREPS' in os.environ:
         n_reps = int(os.environ['NREPS'])
         print '* n_reps =', n_reps
+    if 'HOST' in os.environ:
+        host = os.environ['HOST']
+        print '* host =', host
+    if 'PORT' in os.environ:
+        port = int(os.environ['PORT'])
+        print '* port =', port
 
     while True:
+        if not is_server_alive(host, port):
+            print '* Host is down.  Exiting...'
+            break
+        print '* Host %s:%s is up' % (host, str(port))
         if get_job_level() <= n_threshold:
             print '* Below level %d' % n_threshold
             for _ in xrange(n_reps):
                 os.system(' '.join(argv[1:]))
             print '* Done exec %d' % n_reps
+            print
         time.sleep(1)
 
 if __name__ == '__main__':
