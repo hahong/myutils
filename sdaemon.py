@@ -13,7 +13,7 @@ HOST = None
 PORT = None
 
 
-def is_server_alive(host, port):
+def is_server_alive(host, port, retry=5):
     if host is None or port is None:
         return True    # indefinite running
 
@@ -24,7 +24,9 @@ def is_server_alive(host, port):
         return True
     except:
         # host is down
-        return False
+        if retry <= 0:
+            return False
+        return is_server_alive(host, port, retry=retry - 1)
 
 
 def get_job_level(job_level_cmd=JOB_LEVEL_CMD, screen=['om_']):
