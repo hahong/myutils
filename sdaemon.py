@@ -53,8 +53,8 @@ def main(argv, n_threshold=N_THRESHOLD, n_reps=N_REPS,
         if not is_server_alive(host, port):
             print '* Host is down.  Exiting...'
             break
-        print '* Host %s:%s is up' % (host, str(port))
         if get_job_level() <= n_threshold:
+            print '* Host %s:%s is up' % (host, str(port))
             print '* Below level %d' % n_threshold
             for _ in xrange(n_reps):
                 os.system(' '.join(argv[1:]))
