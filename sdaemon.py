@@ -26,6 +26,7 @@ def is_server_alive(host, port, retry=5):
         # host is down
         if retry <= 0:
             return False
+        print '* Retrying:', retry
         return is_server_alive(host, port, retry=retry - 1)
 
 
