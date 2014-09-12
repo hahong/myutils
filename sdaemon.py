@@ -30,7 +30,7 @@ def main(argv):
 
     while True:
         if get_job_level() <= n_threshold:
-            print '* Below level'
+            print '* Below level %d' % n_threshold
             for _ in xrange(n_reps):
                 os.system(' '.join(argv[1:]))
             print '* Done exec %d' % n_reps
