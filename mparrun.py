@@ -85,8 +85,8 @@ class MyTCPHandler(SocketServer.StreamRequestHandler):
                 M0 = int(floor(lhs0 / 60.))
                 S0 = int(dt % 60)
                 print 'mparrun: %d jobs left' \
-                        ' (%d:%02d:%02d left, %d:%02d:%02d passed)' % \
-                        (n, H, M, S, H0, M0, S0)
+                    ' (%d:%02d:%02d left, %d:%02d:%02d passed)' % \
+                    (n, H, M, S, H0, M0, S0)
 
             # send the job
             jid, job = Q.get()
@@ -146,7 +146,7 @@ server._t0 = None
 
 # Client Part -----------------------------------------------------------------
 def client_worker(addr, port, active, rseed,
-        pmemlimit=PMEMLIMIT, maxcnt=MAXCNT, maxdelay=MAXDELAY):
+                  pmemlimit=PMEMLIMIT, maxcnt=MAXCNT, maxdelay=MAXDELAY):
     errs = []
     stats = []
     cnt = 0
@@ -154,7 +154,11 @@ def client_worker(addr, port, active, rseed,
     pid = os.getpid()
     s_pid = str(pid)
     hostname = os.uname()[1].replace(' ', '')
-    theano_flags_cpu = 'THEANO_FLAGS="base_compiledir=~/.theano%02d"' % rseed
+    if os.getenv('MPARRUN_THEANO_FLAGS') is not None:
+        theano_flags_cpu = os.getenv('MPARRUN_THEANO_FLAGS')
+    else:
+        theano_flags_cpu = \
+            'THEANO_FLAGS="base_compiledir=~/.theano%02d"' % rseed
     random.seed(rseed)
 
     signal.signal(signal.SIGINT, handler_client)
@@ -268,7 +272,7 @@ def cleanup_client():
 
 
 def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX,
-        pmemlimit=PMEMLIMIT, maxcnt=MAXCNT, maxdelay=MAXDELAY):
+           pmemlimit=PMEMLIMIT, maxcnt=MAXCNT, maxdelay=MAXDELAY):
     from joblib import Parallel, delayed
     print 'mparrun: server =', addr
 
@@ -375,7 +379,7 @@ def verify(src_files, stat_files, cmdprn=False):
 
 # Client Spawing Part --------------------------------------------------------
 def spawn(all_args, slist=SLIST, prefix=PREFIX, dry=False, exclude=None,
-        runcmd=False, redir=True):
+          runcmd=False, redir=True):
     from joblib import Parallel, delayed
     import string as ss
 
@@ -390,7 +394,7 @@ def spawn(all_args, slist=SLIST, prefix=PREFIX, dry=False, exclude=None,
         nopass = ['cs', '--n']
     nopass_opts = ['--slist=', '--exclude=']
     passargs = [a for a in all_args if a.lower() not in nopass and
-            all([a[:len(n)] != n for n in nopass_opts])]
+                all([a[:len(n)] != n for n in nopass_opts])]
 
     print 'mparrun: creating jobs:'
     for node_info0 in open(slist).readlines():
@@ -426,26 +430,26 @@ def spawn(all_args, slist=SLIST, prefix=PREFIX, dry=False, exclude=None,
             cmd_run = args
             if redir:
                 cmd_body = "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile" + \
-                        " && %s cd %s && %s 2> %s > %s %s'"
+                    " && %s cd %s && %s 2> %s > %s %s'"
                 cmd = cmd_body % (node, pre_cmd, cd, cmd_run,
-                        stderr, stdout, after_cmd)
+                                  stderr, stdout, after_cmd)
             else:
                 cmd_body = "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile" + \
-                        " && %s cd %s && %s'"
+                    " && %s cd %s && %s'"
                 cmd = cmd_body % (node, pre_cmd, cd, cmd_run)
         else:
             cmd_run = 'mparrun.py c ' + args
             cmd_body = "ssh -i ~/.ssh/id_rsa_ba %s '. ~/.bash_profile" + \
-                    " && %s cd %s && %s 2> %s > %s %s'"
+                " && %s cd %s && %s 2> %s > %s %s'"
             cmd = cmd_body % (node, pre_cmd, cd, cmd_run,
-                    stderr, stdout, after_cmd)
+                              stderr, stdout, after_cmd)
         print '  ', cmd
         jobs.append(cmd)
 
     if not dry:
         print 'mparrun: running jobs...'
         Parallel(n_jobs=len(jobs), verbose=0)(delayed(os.system)(j)
-                for j in jobs)
+                                              for j in jobs)
     else:
         print 'mparrun: DRY-RUN'
     print 'mparrun: all finished.'
@@ -484,7 +488,8 @@ def parse_opts(tokens, optpx='--'):
     n = len(optpx)
 
     for token in tokens:
-        if token[:2] == optpx: opts0.append(token[n:])
+        if token[:2] == optpx:
+            opts0.append(token[n:])
         else:
             args.append(token)
 
@@ -634,17 +639,18 @@ def main():
             addr = f.readline().strip()
             port = int(f.readline().strip())
         exitcode = client(addr, port, nproc, prefix,
-                pmemlimit=pmemlimit, maxcnt=maxcnt, maxdelay=maxdelay)
+                          pmemlimit=pmemlimit, maxcnt=maxcnt,
+                          maxdelay=maxdelay)
 
     # or, spawn clients
     elif mode.lower() == 'cs':
         spawn(sys.argv[1:], slist=slist, prefix=prefix, dry=dry,
-                exclude=exclude)
+              exclude=exclude)
 
     # or, spawn running mode
     elif mode.lower() == 'r':
         spawn(sys.argv[1:], slist=slist, prefix=prefix, dry=dry,
-                exclude=exclude, runcmd=True, redir=redir)
+              exclude=exclude, runcmd=True, redir=redir)
 
     # or, verify
     elif mode.lower() in ['v', 'verify']:
