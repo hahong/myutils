@@ -155,7 +155,8 @@ def client_worker(addr, port, active, rseed,
     s_pid = str(pid)
     hostname = os.uname()[1].replace(' ', '')
     if os.getenv('MPARRUN_THEANO_FLAGS') is not None:
-        theano_flags_cpu = os.getenv('MPARRUN_THEANO_FLAGS')
+        theano_flags_cpu = \
+            'THEANO_FLAGS="' + os.getenv('MPARRUN_THEANO_FLAGS') + '"'
     else:
         theano_flags_cpu = \
             'THEANO_FLAGS="base_compiledir=~/.theano%02d"' % rseed
