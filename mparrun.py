@@ -349,19 +349,22 @@ def verify(src_files, stat_files, cmdprn=False):
 
     badfound = False
     for f in stat_files:
-        stat = pk.load(open(f))
-        for worker in stat:
-            for jid0, errcode, hash in worker:
-                jid = int(jid0)
-                if errcode != 0:
-                    print '* %s: jid=%d, errcode=%d' % (f, jid, errcode)
-                    if cmdprn:
-                        print >>sys.stderr, jobs[jid]
-                    badfound = True
-                if jid not in jid_all:
-                    print '* %s: duplicated jid=%d' % (f, jid)
-                    badfound = True
-                jid_all.remove(jid)
+        try:
+            stat = pk.load(open(f))
+            for worker in stat:
+                for jid0, errcode, hash in worker:
+                    jid = int(jid0)
+                    if errcode != 0:
+                        print '* %s: jid=%d, errcode=%d' % (f, jid, errcode)
+                        if cmdprn:
+                            print >>sys.stderr, jobs[jid]
+                        badfound = True
+                    if jid not in jid_all:
+                        print '* %s: duplicated jid=%d' % (f, jid)
+                        badfound = True
+                    jid_all.remove(jid)
+        except:
+            continue
 
     jid_left = list(jid_all)
     if len(jid_left) > 0:
