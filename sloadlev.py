@@ -6,7 +6,7 @@ import subprocess
 import sys
 import socket
 
-SCREEN_DEF = ['om_', ' node0']
+SCREEN_DEF = ['om_', ' R ', ' node0']
 JOB_LEVEL_CMD = ['squeue', '-o',
                  '%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R   %C']
 NCORES_CMD = 'sinfo -lNe'.split()
