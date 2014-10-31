@@ -20,10 +20,13 @@ def get_total_cores(job_level_cmd=JOB_LEVEL_CMD,
     return sum(cores)
 
 
-def main(argv, def_user=''):
+def main(argv, def_user='', def_opt='-p'):
     user = def_user
-    opt = None
-    if len(argv) == 2:
+    opt = def_opt
+
+    if len(argv) == 1:
+        opt = '-n'
+    elif len(argv) == 2:
         user = argv[1]
     elif len(argv) == 3:
         opt = argv[1]
@@ -36,9 +39,11 @@ def main(argv, def_user=''):
         p_all = get_total_cores(screen=SCREEN_DEF)
         p_user = get_total_cores(screen=SCREEN_DEF + [user])
         print '%5d %5d %6.2f' % (p_all, p_user, 100. * p_user / p_all)
-    else:
+    elif opt == '-n':
         print get_total_cores(screen=SCREEN_DEF + [user])
-
+    else:
+        print 'Option "%s" not understood.' % opt
+        return
 
 if __name__ == '__main__':
     main(sys.argv)
