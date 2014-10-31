@@ -20,14 +20,18 @@ def get_total_cores(job_level_cmd=JOB_LEVEL_CMD,
     return sum(cores)
 
 
-def main(argv, def_user='', def_opt='-p'):
+def main(argv, def_user=os.environ.get('USER', ''), def_opt='-p'):
     user = def_user
     opt = def_opt
 
     if len(argv) == 1:
-        opt = '-n'
+        pass
     elif len(argv) == 2:
-        user = argv[1]
+        if argv[1] == '-n':
+            opt = '-n'
+            user = ''
+        else:
+            user = argv[1]
     elif len(argv) == 3:
         opt = argv[1]
         user = argv[2]
