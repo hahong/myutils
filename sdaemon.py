@@ -7,17 +7,18 @@ import sys
 import socket
 
 # defaults
-N_THRESHOLD = int(os.environ.get('NTHR', 50))
-N_THRESHOLD_LOW = int(os.environ.get('NTHRLOW', 0))
-N_THRESHOLD_SYSLOAD = int(os.environ.get('NTHRSYSLOAD', 12))
-N_REPS = int(os.environ.get('NREPS', 20))
-HOST = os.environ.get('HOST')
-PORT = os.environ.get('PORT')
+N_THRESHOLD = int(os.environ.get('SD_NTHR', 50))
+N_THRESHOLD_LOW = int(os.environ.get('SD_NTHRLOW', 0))
+N_THRESHOLD_SYSLOAD = int(os.environ.get('SD_NTHRSYSLOAD', 12))
+N_RESERVED_MIN = int(os.environ.get('SD_NRESMIN', 40))
+N_REPS = int(os.environ.get('SD_NREPS', 20))
+HOST = os.environ.get('SD_HOST')
+PORT = os.environ.get('SD_PORT')
 PORT = None if PORT is None else int(PORT)
 USER = os.environ.get('USER', 'hahong')
 NCORES_CMD = 'sinfo -lNe'.split()
-PARTITION = os.environ.get('SPARTITION', 'om_all_nodes')
-SVERBOSE = int(os.environ.get('SVERBOSE', 0))
+PARTITION = os.environ.get('SD_PARTITION', 'om_all_nodes')
+SVERBOSE = int(os.environ.get('SD_VERBOSE', 0))
 GET_USAGE_SCR_DEF = [PARTITION[:3]]
 GET_USAGE_SCR_RUN = [' R ', ' node0']
 GET_USAGE_SCR_SUS = [' S ', ' node0']
@@ -85,6 +86,7 @@ def main(argv, n_threshold=N_THRESHOLD,
          n_threshold_low=N_THRESHOLD_LOW,
          n_threshold_sysload=N_THRESHOLD_SYSLOAD,
          n_reps=N_REPS,
+         n_reserved_min=N_RESERVED_MIN,
          n_cpus=N_TOTAL_CPUS,
          host=HOST, port=PORT,
          verbose=SVERBOSE):
@@ -95,6 +97,7 @@ def main(argv, n_threshold=N_THRESHOLD,
     print '* n_threshold:', n_threshold
     print '* n_thr_low  :', n_threshold_low
     print '* n_thr_sysld:', n_threshold_sysload
+    print '* n_resv_min :', n_reserved_min
     print '* n_reps     :', n_reps
     print '* n_cpus     :', n_cpus
     print '* host       :', host
@@ -119,7 +122,7 @@ def main(argv, n_threshold=N_THRESHOLD,
                 q_jobs = True
             elif (n_threads_all < n_threshold and
                   n_threads_notrun < n_threshold_sysload and
-                  n_threads_everyone < n_cpus - 10):
+                  n_threads_everyone < n_cpus - n_reserved_min):
                 print '* Below level %d' % n_threshold
                 q_jobs = True
 

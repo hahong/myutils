@@ -39,6 +39,7 @@ SEP = '+xx ||*-1)'
 SELF_SHUTDOWN = True
 EOJ = 'end-of-job'
 PREFIX = 'mparrun'
+PREVENT_DUMP = 'NONE'
 ALARM = 10
 TFMT = '%Y%m%d_%H%M%S'
 
@@ -301,18 +302,20 @@ def client(addr, port=PORT, nproc=NPROC, prefix=PREFIX,
         if len(r[0]) > 0:
             err_found = True
             break
-    if err_found:
-        dmpfn = prefix + '_dmp_' + endtime + '.pk'
-        dmp = open(dmpfn, 'wb')
-        print 'mparrun: there were warnings/errors. dumping...', dmpfn
-        pk.dump([r[0] for r in res], dmp)
-        dmp.close()
 
-    # dump stats: extract other task info
-    dmpfn = prefix + '_stat_' + hostname + '_' + endtime + '.pk'
-    dmp = open(dmpfn, 'wb')
-    pk.dump([r[1] for r in res], dmp)
-    dmp.close()
+    if prefix != PREVENT_DUMP:
+        if err_found:
+            dmpfn = prefix + '_dmp_' + endtime + '.pk'
+            dmp = open(dmpfn, 'wb')
+            print 'mparrun: there were warnings/errors. dumping...', dmpfn
+            pk.dump([r[0] for r in res], dmp)
+            dmp.close()
+
+        # dump stats: extract other task info
+        dmpfn = prefix + '_stat_' + hostname + '_' + endtime + '.pk'
+        dmp = open(dmpfn, 'wb')
+        pk.dump([r[1] for r in res], dmp)
+        dmp.close()
 
     # cleanup and exit
     cleanup_client()
