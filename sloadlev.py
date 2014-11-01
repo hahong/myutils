@@ -1,31 +1,29 @@
 #!/usr/bin/env python
 
 import os
-import time
 import subprocess
 import sys
-import socket
 
 SCREEN_DEF = ['om_', ' R ', ' node0']
 JOB_LEVEL_CMD = ['squeue', '-o',
                  '%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R   %C']
 NCORES_CMD = 'sinfo -lNe'.split()
 
+
 def get_total_threads(ncores_cmd=NCORES_CMD, screen=['om_all_nodes'],
                       idx_cpu=4, idx_node=1):
     output = subprocess.Popen(ncores_cmd,
-                              stdout=subprocess.PIPE
-                             ).communicate()[0]
+                              stdout=subprocess.PIPE).communicate()[0]
     threads = [int(e.split()[idx_node]) * int(e.split()[idx_cpu])
                for e in output.split('\n') if
                all([s in e for s in screen])]
     return sum(threads)
 
+
 def get_usage(job_level_cmd=JOB_LEVEL_CMD,
               screen=SCREEN_DEF, idx_cpu=-1):
     output = subprocess.Popen(job_level_cmd,
-                              stdout=subprocess.PIPE
-                             ).communicate()[0]
+                              stdout=subprocess.PIPE).communicate()[0]
     cores = [int(e.split()[idx_cpu]) for e in output.split('\n') if
              all([s in e for s in screen])]
     return sum(cores)
