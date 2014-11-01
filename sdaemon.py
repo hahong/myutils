@@ -123,6 +123,7 @@ def main(argv, n_threshold=N_THRESHOLD,
                 msg = '* Below level %d' % n_threshold
                 q_jobs = True
 
+            nmsg = ''
             if q_jobs:
                 print
                 print '* Host %s:%s is up' % (host, str(port))
@@ -130,16 +131,27 @@ def main(argv, n_threshold=N_THRESHOLD,
                 for _ in xrange(n_reps):
                     os.system(' '.join(argv[1:]))
                 print '* Done submitting %d' % n_reps
+            else:
+                if n_threads_all >= n_threshold:
+                    nmsg = ' | too many user threads (%d >= %d)' % \
+                        (n_threads_all, n_threshold)
+                elif n_threads_notrun >= n_threshold_sysload:
+                    nmsg = ' | too many waiting threads (%d >= %d)' % \
+                        (n_threads_notrun, n_threshold_sysload)
+                elif n_threads_everyone >= n_cpus - n_reserved_min:
+                    nmsg = ' | high system load (%d >= %d)' % \
+                        (n_threads_everyone, n_cpus - n_reserved_min)
 
             if q_jobs or verbose > 0:
                 p_user = 100. * n_threads_all / n_cpus
                 p_everyone = 100. * n_threads_everyone / n_cpus
                 print '* System load: user=%d/%d=%5.2f%% ' \
                     '(norun=%d) ' \
-                    'total=%d/%d=%5.2f%%' % (
+                    'total=%d/%d=%5.2f%%%s' % (
                         n_threads_all, n_cpus, p_user,
                         n_threads_notrun,
-                        n_threads_everyone, n_cpus, p_everyone)
+                        n_threads_everyone, n_cpus, p_everyone,
+                        nmsg)
 
         except Exception as e:
             print '*** Unknown error:', e
