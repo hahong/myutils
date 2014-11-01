@@ -17,6 +17,7 @@ PORT = None if PORT is None else int(PORT)
 USER = os.environ.get('USER', 'hahong')
 NCORES_CMD = 'sinfo -lNe'.split()
 PARTITION = os.environ.get('SPARTITION', 'om_all_nodes')
+SVERBOSE = int(os.environ.get('SVERBOSE', 0))
 GET_USAGE_SCR_DEF = [PARTITION[:3]]
 GET_USAGE_SCR_RUN = [' R ', ' node0']
 GET_USAGE_SCR_SUS = [' S ', ' node0']
@@ -85,7 +86,8 @@ def main(argv, n_threshold=N_THRESHOLD,
          n_threshold_sysload=N_THRESHOLD_SYSLOAD,
          n_reps=N_REPS,
          n_cpus=N_TOTAL_CPUS,
-         host=HOST, port=PORT):
+         host=HOST, port=PORT,
+         verbose=SVERBOSE):
 
     if n_threshold < n_threshold_low:
         n_threshold = n_threshold_low
@@ -106,6 +108,10 @@ def main(argv, n_threshold=N_THRESHOLD,
 
         q_jobs = False
         n_threads_all, _, n_threads_notrun, n_threads_everyone = get_usage()
+        if verbose > 0:
+            print '* #user, #norun, #everyone = %d, %d, %d' % (
+                n_threads_all, n_threads_notrun, n_threads_everyone)
+
         if n_threads_all < n_threshold_low:
             print '* Below min level %d' % n_threshold_low
             q_jobs = True
