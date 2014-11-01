@@ -9,7 +9,7 @@ import socket
 # defaults
 N_THRESHOLD = int(os.environ.get('NTHR', 50))
 N_THRESHOLD_LOW = int(os.environ.get('NTHRLOW', 0))
-N_THRESHOLD_SYSLOAD = int(os.environ.get('NTHRSYSLOAD', 8))
+N_THRESHOLD_SYSLOAD = int(os.environ.get('NTHRSYSLOAD', 12))
 N_REPS = int(os.environ.get('NREPS', 20))
 HOST = os.environ.get('HOST')
 PORT = os.environ.get('PORT')
@@ -107,31 +107,36 @@ def main(argv, n_threshold=N_THRESHOLD,
             break
 
         q_jobs = False
-        n_threads_all, _, n_threads_notrun, n_threads_everyone = get_usage()
-        if verbose > 0:
-            print '* #user, #norun, #everyone = %d, %d, %d' % (
-                n_threads_all, n_threads_notrun, n_threads_everyone)
+        try:
+            n_threads_all, _, n_threads_notrun, n_threads_everyone = \
+                get_usage()
+            if verbose > 0:
+                print '* #user, #norun, #everyone = %d, %d, %d' % (
+                    n_threads_all, n_threads_notrun, n_threads_everyone)
 
-        if n_threads_all < n_threshold_low:
-            print '* Below min level %d' % n_threshold_low
-            q_jobs = True
-        elif (n_threads_all < n_threshold and
-              n_threads_notrun < n_threshold_sysload and
-              n_threads_everyone < n_cpus - 10):
-            print '* Below level %d' % n_threshold
-            q_jobs = True
+            if n_threads_all < n_threshold_low:
+                print '* Below min level %d' % n_threshold_low
+                q_jobs = True
+            elif (n_threads_all < n_threshold and
+                  n_threads_notrun < n_threshold_sysload and
+                  n_threads_everyone < n_cpus - 10):
+                print '* Below level %d' % n_threshold
+                q_jobs = True
 
-        if q_jobs:
-            p_user = 100. * n_threads_all / n_cpus
-            p_everyone = 100. * n_threads_everyone / n_cpus
-            print '* Host %s:%s is up' % (host, str(port))
-            for _ in xrange(n_reps):
-                os.system(' '.join(argv[1:]))
-            print '* Done submitting %d' % n_reps
-            print '* System load: user=%d/%d=%5.2f%% total=%d/%d=%5.2f%%' % (
-                n_threads_all, n_cpus, p_user,
-                n_threads_everyone, n_cpus, p_everyone)
-            print
+            if q_jobs:
+                p_user = 100. * n_threads_all / n_cpus
+                p_everyone = 100. * n_threads_everyone / n_cpus
+                print '* Host %s:%s is up' % (host, str(port))
+                for _ in xrange(n_reps):
+                    os.system(' '.join(argv[1:]))
+                print '* Done submitting %d' % n_reps
+                print '* System load: user=%d/%d=%5.2f%% ' \
+                    'total=%d/%d=%5.2f%%' % (
+                        n_threads_all, n_cpus, p_user,
+                        n_threads_everyone, n_cpus, p_everyone)
+                print
+        except Exception as e:
+            print '*** Unknown error:', e
         time.sleep(3)
 
 if __name__ == '__main__':
