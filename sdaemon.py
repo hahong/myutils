@@ -113,31 +113,34 @@ def main(argv, n_threshold=N_THRESHOLD,
         try:
             n_threads_all, _, n_threads_notrun, n_threads_everyone = \
                 get_usage()
-            if verbose > 0:
-                print '* #user, #norun, #everyone = %d, %d, %d' % (
-                    n_threads_all, n_threads_notrun, n_threads_everyone)
 
             if n_threads_all < n_threshold_low:
-                print '* Below min level %d' % n_threshold_low
+                msg = '* Below min level %d' % n_threshold_low
                 q_jobs = True
             elif (n_threads_all < n_threshold and
                   n_threads_notrun < n_threshold_sysload and
                   n_threads_everyone < n_cpus - n_reserved_min):
-                print '* Below level %d' % n_threshold
+                msg = '* Below level %d' % n_threshold
                 q_jobs = True
 
             if q_jobs:
-                p_user = 100. * n_threads_all / n_cpus
-                p_everyone = 100. * n_threads_everyone / n_cpus
+                print
                 print '* Host %s:%s is up' % (host, str(port))
+                print msg
                 for _ in xrange(n_reps):
                     os.system(' '.join(argv[1:]))
                 print '* Done submitting %d' % n_reps
+
+            if q_jobs or verbose > 0:
+                p_user = 100. * n_threads_all / n_cpus
+                p_everyone = 100. * n_threads_everyone / n_cpus
                 print '* System load: user=%d/%d=%5.2f%% ' \
+                    '(norun=%d) ' \
                     'total=%d/%d=%5.2f%%' % (
                         n_threads_all, n_cpus, p_user,
+                        n_threads_notrun,
                         n_threads_everyone, n_cpus, p_everyone)
-                print
+
         except Exception as e:
             print '*** Unknown error:', e
         time.sleep(3)
